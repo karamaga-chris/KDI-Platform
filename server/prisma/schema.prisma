@@ -1,0 +1,100 @@
+// Kigali Digital Infrastructure Ltd — data model
+// The audit trail (AuditEvent) is deliberately append-only in application logic:
+// every migration state transition writes one immutable row. This is the evidence
+// base for client trust, compliance, and the Capstone panel.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ServiceTier {
+  STARTUP   // $150 MRR
+  GROWTH    // $300 MRR
+  PREMIUM   // $500 MRR
+}
+
+enum MigrationType {
+  MIGRATION   // existing app moving off offshore hosting (the original 3-pillar flow)
+  GREENFIELD  // brand-new app being hosted locally for the first time — no source to migrate
+}
+
+model Client {
+  id            String      @id @default(cuid())
+  orgName       String
+  sector        String      // fintech, e-commerce, digital-health, ...
+  currentProvider String    // e.g. "AWS eu-central-1"
+  endpoint      String?     // real client URL to monitor (e.g. https://app.client.rw)
+  dataVolumeGB  Int
+  tier          ServiceTier @default(STARTUP)
+  createdAt     DateTime    @default(now())
+  migrations    Migration[]
+  invoices      Invoice[]
+}
+
+model Migration {
+  id                  String       @id @default(cuid())
+  clientId            String
+  client              Client       @relation(fields: [clientId], references: [id])
+  migrationType       MigrationType @default(MIGRATION)
+  state               String       @default("created") // mirrors XState value
+  providerId          String?      // aos | adc | paix
+  dataVolumeGB        Int?
+  estimatedDowntimeMin Int?
+  replicationLagSec   Int?
+  integrityPassed     Boolean      @default(false)
+  clientSignedOff     Boolean      @default(false)
+  smokeTestPassed     Boolean      @default(false)  // greenfield equivalent of integrity check
+  cutoverAt           DateTime?
+  goLiveAt            DateTime?    // greenfield equivalent of cutoverAt
+  guaranteeWindowDays Int          @default(30)
+  latencyBeforeMs     Int?         // offshore/source baseline (MIGRATION only)
+  latencyAfterMs      Int?
+  targetEndpoint      String?      // the REAL local URL monitored once live (post-cutover / post-launch)
+  auditReportJson      String?     // cached audit/readiness report payload
+  error               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  events              AuditEvent[]
+  uptime              UptimeSample[]
+}
+
+model AuditEvent {
+  id          String    @id @default(cuid())
+  migrationId String
+  migration   Migration @relation(fields: [migrationId], references: [id])
+  fromState   String
+  toState     String
+  eventType   String
+  pillar      Int       // 1, 2 or 3
+  detail      String?   // JSON string with context snapshot
+  createdAt   DateTime  @default(now())
+}
+
+model UptimeSample {
+  id          String    @id @default(cuid())
+  migrationId String
+  migration   Migration @relation(fields: [migrationId], references: [id])
+  up          Boolean
+  latencyMs   Int
+  source      String    @default("simulated") // uptimerobot | http-probe | simulated
+  at          DateTime  @default(now())
+}
+
+model Invoice {
+  id           String      @id @default(cuid())
+  clientId     String
+  client       Client      @relation(fields: [clientId], references: [id])
+  periodStart  DateTime
+  periodEnd    DateTime
+  wholesaleUsd Float       // COGS
+  retailUsd    Float       // MRR charged
+  marginUsd    Float
+  rwfAmount    Float       // RWF-denominated total (predictable billing promise)
+  fxRate       Float       // USD->RWF at issue
+  createdAt    DateTime    @default(now())
+}
