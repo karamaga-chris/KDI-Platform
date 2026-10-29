@@ -180,7 +180,7 @@ export async function autoStep(migrationId: string, preferredProviderId?: string
       const estimatedDowntimeMin = 3 + Math.floor(Math.random() * 2);
       const res = await applyEvent(migrationId, {
         type: 'AUDIT_COMPLETE',
-        dataVolumeGB: row.dataVolumeGB,
+        dataVolumeGB: row.dataVolumeGB ?? 0,
         estimatedDowntimeMin,
         latencyBeforeMs,
       });
@@ -200,7 +200,7 @@ export async function autoStep(migrationId: string, preferredProviderId?: string
 
     // ---- GREENFIELD: Pillar 1 ----
     case 'intake': {
-      const res = await applyEvent(migrationId, { type: 'INTAKE_COMPLETE', dataVolumeGB: row.dataVolumeGB });
+      const res = await applyEvent(migrationId, { type: 'INTAKE_COMPLETE', dataVolumeGB: row.dataVolumeGB ?? 0 });
       await getOrBuildAuditReport(migrationId);
       return res;
     }
@@ -218,7 +218,7 @@ export async function autoStep(migrationId: string, preferredProviderId?: string
     // ---- Shared Pillar 2 entry: provisioning sets the REAL local target endpoint ----
     case 'provisioning': {
       const provider = getProvider(row.providerId ?? 'aos')!;
-      await provider.provision({ migrationId, dataVolumeGB: row.dataVolumeGB });
+      await provider.provision({ migrationId, dataVolumeGB: row.dataVolumeGB ?? 0 });
       // The local mock Tier III origin stands in for "this client's app on
       // local infrastructure." In production this would be the real
       // provisioned VM's address. See mock-origin.ts.

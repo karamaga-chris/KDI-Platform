@@ -2,6 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import { PillarPipeline } from '../components/PillarPipeline';
 
+// How often to poll a monitoring sample while a client is live. Configurable
+// per-deployment so pilot scale (a handful of clients) and later scale (many
+// concurrently "live" clients hammering the sample endpoint) can differ
+// without a code change.
+const POLL_MS = Number(import.meta.env.VITE_POLL_MS ?? 3000);
+
 const REPORT_STATES = new Set(['auditReady', 'sizingReady']);
 // Same states — this is exactly the "which Tier III partner hosts this
 // client" decision point, so the operator picker lives alongside the report.
@@ -35,13 +41,13 @@ export function MigrationView({ id, onBack }: { id: string; onBack: () => void }
 
   useEffect(() => { load(); }, [load]);
 
-  // When live, poll a monitoring sample every 3s to feed the latency chart.
+  // When live, poll a monitoring sample to feed the latency chart.
   useEffect(() => {
     if (m?.state !== 'monitoring') return;
     const t = setInterval(async () => {
       await api.sample(id).catch(() => {});
       await load();
-    }, 3000);
+    }, POLL_MS);
     return () => clearInterval(t);
   }, [m?.state, id, load]);
 
@@ -164,7 +170,7 @@ export function MigrationView({ id, onBack }: { id: string; onBack: () => void }
                   <div>
                     <strong>{p.name}</strong>
                     <div className="muted">
-                      {p.region} · {p.metrics.utilizationPct.toFixed(0)}% utilized · {p.metrics.availableVcpu} vCPU available · ${p.metrics.wholesaleUsdPerVmMonth}/VM/mo
+                      {p.region} · {p.metrics.utilizationPct.toFixed(0)}% utilized · {p.metrics.availableVcpu} vCPU available · RWF {p.metrics.wholesaleRwfPerVmMonth.toLocaleString()}/VM/mo
                       {p.metrics.utilizationPct >= 80 && <span className="flag flag-warn"> · at capacity</span>}
                     </div>
                   </div>
@@ -180,7 +186,12 @@ export function MigrationView({ id, onBack }: { id: string; onBack: () => void }
         <div className="card report-card">
           <div className="head-row">
             <h3>{report?.title ?? 'Report'}</h3>
-            <a className="btn small" href={api.auditReportPdfUrl(id)} target="_blank" rel="noreferrer">⬇ Download PDF</a>
+            <button
+              className="btn small"
+              onClick={() => api.downloadAuditReportPdf(id, `KDI-report-${id}.pdf`).catch((e: any) => setErr(e.message))}
+            >
+              ⬇ Download PDF
+            </button>
           </div>
           {!report ? <div className="muted">Generating…</div> : (
             <>

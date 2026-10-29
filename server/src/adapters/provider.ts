@@ -26,7 +26,7 @@ export type ProvisionResult = {
 export type ProviderMetrics = {
   utilizationPct: number;      // how full the provider is (for placement decisions)
   availableVcpu: number;
-  wholesaleUsdPerVmMonth: number; // negotiated wholesale rate (COGS) — fixed, per Annex A.2
+  wholesaleRwfPerVmMonth: number; // negotiated wholesale rate (COGS), RWF-native — fixed, per Annex A.2
 };
 
 export interface ProviderAdapter {
@@ -52,7 +52,7 @@ class MockProvider implements ProviderAdapter {
     public readonly id: string,
     public readonly name: string,
     public readonly region: string,
-    private readonly wholesaleRate: number, // fixed, negotiated $/VM/month
+    private readonly wholesaleRate: number, // fixed, negotiated RWF/VM/month
     private readonly baseUtilizationPct: number, // fixed starting utilization
     private readonly totalVcpu: number = 400, // total pool this facility offers
   ) {}
@@ -74,14 +74,16 @@ class MockProvider implements ProviderAdapter {
     // here — a real, explainable number, not simulated noise.
     const utilizationPct = Math.min(95, this.baseUtilizationPct + this.provisionedCount * 2);
     const availableVcpu = Math.max(0, Math.round(this.totalVcpu * (1 - utilizationPct / 100)));
-    return { utilizationPct, availableVcpu, wholesaleUsdPerVmMonth: this.wholesaleRate };
+    return { utilizationPct, availableVcpu, wholesaleRwfPerVmMonth: this.wholesaleRate };
   }
 }
 
+// Negotiated USD rates ($60/$70/$65 per VM/mo) converted to RWF at the same
+// illustrative FX rate used in billing.ts (1 USD = 1,465 RWF), per Annex A.2.
 export const PROVIDERS: ProviderAdapter[] = [
-  new MockProvider('aos', 'AOS Rwanda (National Data Center)', 'Kigali', 60, 55),
-  new MockProvider('adc', 'ADC', 'Kigali', 70, 48),
-  new MockProvider('paix', 'PAIX Rwanda', 'Kigali', 65, 62),
+  new MockProvider('aos', 'AOS Rwanda (National Data Center)', 'Kigali', 88_000, 55),
+  new MockProvider('adc', 'ADC', 'Kigali', 102_500, 48),
+  new MockProvider('paix', 'PAIX Rwanda', 'Kigali', 95_000, 62),
 ];
 
 export function getProvider(id: string): ProviderAdapter | undefined {
@@ -123,7 +125,7 @@ export async function recommendProvider(
     }
     return {
       providerId: chosen.p.id,
-      reason: `Operator-selected placement at ${chosen.p.name} (${chosen.m.utilizationPct.toFixed(0)}% utilized, $${chosen.m.wholesaleUsdPerVmMonth}/VM/mo).`,
+      reason: `Operator-selected placement at ${chosen.p.name} (${chosen.m.utilizationPct.toFixed(0)}% utilized, RWF ${chosen.m.wholesaleRwfPerVmMonth.toLocaleString()}/VM/mo).`,
       overridden: true,
     };
   }
@@ -131,20 +133,20 @@ export async function recommendProvider(
   const viable = scored.filter((s) => s.m.utilizationPct < VIABILITY_UTILIZATION_CEILING);
   const pool = viable.length ? viable : scored;
   // Deterministic ordering: cheapest wholesale rate first, ties broken by most spare vCPU.
-  pool.sort((a, b) => a.m.wholesaleUsdPerVmMonth - b.m.wholesaleUsdPerVmMonth || b.m.availableVcpu - a.m.availableVcpu);
+  pool.sort((a, b) => a.m.wholesaleRwfPerVmMonth - b.m.wholesaleRwfPerVmMonth || b.m.availableVcpu - a.m.availableVcpu);
   const best = pool[0];
 
   if (!viable.length) {
     return {
       providerId: best.p.id,
-      reason: `All partners are at or above ${VIABILITY_UTILIZATION_CEILING}% utilization; placing at ${best.p.name} as the least-loaded option ($${best.m.wholesaleUsdPerVmMonth}/VM/mo, ${best.m.utilizationPct.toFixed(0)}% utilized). Consider onboarding an additional wholesale partner.`,
+      reason: `All partners are at or above ${VIABILITY_UTILIZATION_CEILING}% utilization; placing at ${best.p.name} as the least-loaded option (RWF ${best.m.wholesaleRwfPerVmMonth.toLocaleString()}/VM/mo, ${best.m.utilizationPct.toFixed(0)}% utilized). Consider onboarding an additional wholesale partner.`,
       overridden: false,
     };
   }
 
   return {
     providerId: best.p.id,
-    reason: `Lowest negotiated wholesale rate ($${best.m.wholesaleUsdPerVmMonth}/VM/mo) among partners with spare capacity (${best.m.utilizationPct.toFixed(0)}% utilized, ${best.m.availableVcpu} vCPU available).`,
+    reason: `Lowest negotiated wholesale rate (RWF ${best.m.wholesaleRwfPerVmMonth.toLocaleString()}/VM/mo) among partners with spare capacity (${best.m.utilizationPct.toFixed(0)}% utilized, ${best.m.availableVcpu} vCPU available).`,
     overridden: false,
   };
 }

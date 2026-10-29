@@ -86,15 +86,16 @@ model UptimeSample {
 }
 
 model Invoice {
-  id           String      @id @default(cuid())
-  clientId     String
-  client       Client      @relation(fields: [clientId], references: [id])
-  periodStart  DateTime
-  periodEnd    DateTime
-  wholesaleUsd Float       // COGS
-  retailUsd    Float       // MRR charged
-  marginUsd    Float
-  rwfAmount    Float       // RWF-denominated total (predictable billing promise)
-  fxRate       Float       // USD->RWF at issue
-  createdAt    DateTime    @default(now())
+  id            String      @id @default(cuid())
+  clientId      String
+  client        Client      @relation(fields: [clientId], references: [id])
+  periodStart   DateTime
+  periodEnd     DateTime
+  wholesaleRwf  Float       // COGS, RWF (AOS wholesale rate for the client's tier)
+  retailRwf     Float       // MRR charged, RWF — the platform's RWF-native price
+  marginRwf     Float
+  rwfAmount     Float       // RWF-denominated total (predictable billing promise) — equals retailRwf
+  usdEquivalent Float       // Derived for reporting only; RWF is the source of truth
+  fxRate        Float       // RWF->USD at issue
+  createdAt     DateTime    @default(now())
 }

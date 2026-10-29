@@ -45,7 +45,7 @@ export function Dashboard({ onOpen }: { onOpen: (migrationId: string) => void })
   return (
     <div>
       <div className="grid3">
-        <div className="stat"><span className="big">{ledger?.aggregateMrr ? `$${ledger.aggregateMrr}` : '—'}</span><label>Aggregate MRR</label></div>
+        <div className="stat"><span className="big">{ledger?.aggregateMrr ? `RWF ${ledger.aggregateMrr.toLocaleString()}` : '—'}</span><label>Aggregate MRR</label></div>
         <div className="stat"><span className="big">{ledger ? `${ledger.grossMarginPct}%` : '—'}</span><label>Blended gross margin</label></div>
         <div className="stat"><span className="big">{clients.length}</span><label>Pilot clients</label></div>
       </div>
@@ -87,13 +87,13 @@ export function Dashboard({ onOpen }: { onOpen: (migrationId: string) => void })
         <div className="card">
           <h3>Provider capacity (placement pool)</h3>
           <table className="audit">
-            <thead><tr><th>Provider</th><th>Utilisation</th><th>Wholesale $/VM</th></tr></thead>
+            <thead><tr><th>Provider</th><th>Utilisation</th><th>Wholesale RWF/VM</th></tr></thead>
             <tbody>
               {providers.map((p) => (
                 <tr key={p.id}>
                   <td>{p.name}</td>
                   <td>{p.metrics.utilizationPct.toFixed(0)}%</td>
-                  <td>${p.metrics.wholesaleUsdPerVmMonth}</td>
+                  <td>RWF {p.metrics.wholesaleRwfPerVmMonth.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -139,9 +139,9 @@ export function Dashboard({ onOpen }: { onOpen: (migrationId: string) => void })
 
           <input type="number" placeholder="Expected data GB" value={form.dataVolumeGB} onChange={(e) => setForm({ ...form, dataVolumeGB: Number(e.target.value) })} />
           <select value={form.tier} onChange={(e) => setForm({ ...form, tier: e.target.value })}>
-            <option value="STARTUP">STARTUP ($150)</option>
-            <option value="GROWTH">GROWTH ($300)</option>
-            <option value="PREMIUM">PREMIUM ($500)</option>
+            <option value="STARTUP">STARTUP (RWF 115,000)</option>
+            <option value="GROWTH">GROWTH (RWF 220,000)</option>
+            <option value="PREMIUM">PREMIUM (RWF 365,000)</option>
           </select>
           <button className="btn primary" type="submit">
             {isGreenfield ? 'Create & start sizing' : 'Create & open migration'}

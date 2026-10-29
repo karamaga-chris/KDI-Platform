@@ -92,20 +92,51 @@ export class UptimeRobotAdapter implements MonitoringAdapter {
   // Cache endpoint URL -> UptimeRobot monitor id so we don't re-create monitors.
   private readonly monitorCache = new Map<string, number>();
 
-  constructor(private readonly apiKey: string) {}
+  constructor(
+    private readonly apiKey: string,
+    private readonly timeoutMs = 8000,
+    private readonly maxRetries = 1,
+  ) {}
 
-  private async post(path: string, params: Record<string, string>): Promise<any> {
-    const res = await fetch(`${this.base}/${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
-      body: new URLSearchParams({ api_key: this.apiKey, format: 'json', ...params }),
-    });
-    if (!res.ok) throw new Error(`UptimeRobot HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.stat === 'fail') {
-      throw new Error(`UptimeRobot API error: ${data.error?.message ?? 'unknown'}`);
+  private async postOnce(path: string, params: Record<string, string>): Promise<any> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const res = await fetch(`${this.base}/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Cache-Control': 'no-cache' },
+        body: new URLSearchParams({ api_key: this.apiKey, format: 'json', ...params }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`UptimeRobot HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.stat === 'fail') {
+        throw new Error(`UptimeRobot API error: ${data.error?.message ?? 'unknown'}`);
+      }
+      return data;
+    } finally {
+      clearTimeout(timer);
     }
-    return data;
+  }
+
+  /** A slow/unresponsive third party can't hang the caller: bounded by timeoutMs,
+   * with one retry for transient failures (timeout, network error, HTTP 5xx). */
+  private async post(path: string, params: Record<string, string>): Promise<any> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await this.postOnce(path, params);
+      } catch (e: any) {
+        lastErr = e;
+        // Retry only what's plausibly transient: a timeout, a 5xx, or a raw
+        // network failure. Not a 4xx or an API-level "stat: fail" (bad key,
+        // bad params) — those won't succeed on retry.
+        const msg = e?.message ?? '';
+        const retryable = e?.name === 'AbortError' || /HTTP 5\d\d/.test(msg) || !/^UptimeRobot (HTTP|API error)/.test(msg);
+        if (!retryable || attempt === this.maxRetries) break;
+      }
+    }
+    throw lastErr;
   }
 
   /** Find an existing monitor for this exact URL, or create one. Returns monitor id. */

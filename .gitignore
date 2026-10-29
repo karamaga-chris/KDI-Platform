@@ -6,3 +6,4 @@ client/dist/
 server/dist/
 server/prisma/migrations/dev.db*
 .DS_Store
+*.tsbuildinfo

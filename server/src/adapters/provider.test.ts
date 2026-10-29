@@ -33,11 +33,12 @@ describe('provider placement (deterministic, not random)', () => {
   });
 
   it('recommends the cheapest viable partner by NEGOTIATED wholesale rate, deterministically', async () => {
-    // AOS ($60/VM/mo) undercuts ADC ($70) and PAIX ($65) and starts well under
-    // the viability ceiling, so it must be the default pick with a fresh pool.
+    // AOS (RWF 88,000/VM/mo) undercuts ADC (RWF 102,500) and PAIX (RWF 95,000)
+    // and starts well under the viability ceiling, so it must be the default
+    // pick with a fresh pool.
     const { providerId, reason } = await recommendProvider();
     expect(providerId).toBe('aos');
-    expect(reason).toMatch(/\$60\/VM\/mo/);
+    expect(reason).toMatch(/RWF 88,000\/VM\/mo/);
   });
 
   it('utilization moves ONLY when a real client is actually provisioned, by a fixed step', async () => {

@@ -22,6 +22,9 @@ export default function App() {
           ? <MigrationView id={openId} onBack={() => setOpenId(null)} />
           : <Dashboard onOpen={setOpenId} />}
       </main>
+      <footer className="footer">
+        © {new Date().getFullYear()} Kigali Digital Infrastructure Ltd. All rights reserved.
+      </footer>
     </div>
   );
 }
