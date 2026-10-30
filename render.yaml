@@ -11,7 +11,7 @@ services:
     plan: free
     rootDir: server
     healthCheckPath: /api/health
-    buildCommand: npm install && npm run prisma:generate && npm run build
+    buildCommand: npm ci --include=dev && npm run prisma:generate && npm run build
     startCommand: npm run prisma:deploy && npm start
     envVars:
       - key: NODE_ENV
