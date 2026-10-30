@@ -15,6 +15,7 @@ export function Dashboard({ onOpen }: { onOpen: (migrationId: string) => void })
     tier: 'GROWTH',
   });
   const [page, setPage] = useState(1);
+  const [createError, setCreateError] = useState<string | null>(null);
   const PAGE_SIZE = 5;
 
   async function load() {
@@ -25,15 +26,20 @@ export function Dashboard({ onOpen }: { onOpen: (migrationId: string) => void })
 
   async function create(e: any) {
     e.preventDefault();
+    setCreateError(null);
     const payload: any = { ...form, dataVolumeGB: Number(form.dataVolumeGB) };
     if (form.migrationType === 'GREENFIELD') {
       // No existing host to describe for a brand-new app.
       delete payload.currentProvider;
       delete payload.endpoint;
     }
-    const { migration } = await api.createClient(payload);
-    await load();
-    onOpen(migration.id);
+    try {
+      const { migration } = await api.createClient(payload);
+      await load();
+      onOpen(migration.id);
+    } catch (err: any) {
+      setCreateError(err.message ?? 'Failed to create client');
+    }
   }
 
   const isGreenfield = form.migrationType === 'GREENFIELD';
@@ -146,6 +152,7 @@ export function Dashboard({ onOpen }: { onOpen: (migrationId: string) => void })
           <button className="btn primary" type="submit">
             {isGreenfield ? 'Create & start sizing' : 'Create & open migration'}
           </button>
+          {createError && <p className="error">{createError}</p>}
         </form>
       </div>
     </div>

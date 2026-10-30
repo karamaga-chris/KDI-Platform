@@ -1,6 +1,23 @@
 const BASE = import.meta.env.VITE_API ?? 'http://localhost:4000';
 const API_TOKEN = import.meta.env.VITE_API_TOKEN as string | undefined;
 
+// Server errors are either a plain string, or a Zod `.flatten()` shape
+// ({ formErrors: string[], fieldErrors: Record<string, string[]> }).
+function formatApiError(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object') {
+    const e = error as { message?: string; formErrors?: string[]; fieldErrors?: Record<string, string[]> };
+    if (e.message) return e.message;
+    const parts = [
+      ...(e.formErrors ?? []),
+      ...Object.entries(e.fieldErrors ?? {}).map(([field, msgs]) => `${field}: ${msgs.join(', ')}`),
+    ];
+    if (parts.length) return parts.join('; ');
+  }
+  return JSON.stringify(error);
+}
+
 async function j(path: string, opts?: RequestInit) {
   const headers: Record<string, string> = { ...(opts?.headers as Record<string, string> ?? {}) };
   if (opts?.body) headers['Content-Type'] = 'application/json'; // only set when there IS a body
@@ -8,7 +25,7 @@ async function j(path: string, opts?: RequestInit) {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message ?? body.error ?? `HTTP ${res.status}`);
+    throw new Error(formatApiError(body.error) ?? `HTTP ${res.status}`);
   }
   return res.json();
 }
