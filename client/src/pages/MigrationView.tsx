@@ -290,7 +290,8 @@ function Sparkline({ samples }: { samples: any[] }) {
   const pts = samples.slice(-40);
   if (!pts.length) return <div className="muted">Collecting samples…</div>;
   const w = 320, h = 60, max = Math.max(120, ...pts.map((s) => s.latencyMs));
-  const path = pts.map((s, i) => `${(i / (pts.length - 1)) * w},${h - (s.latencyMs / max) * h}`).join(' ');
+  const denom = pts.length - 1 || 1; // avoid 0/0 when there's only one sample so far
+  const path = pts.map((s, i) => `${(i / denom) * w},${h - (s.latencyMs / max) * h}`).join(' ');
   return (
     <svg width={w} height={h} className="spark">
       <line x1={0} y1={h - (100 / max) * h} x2={w} y2={h - (100 / max) * h} stroke="#e11d48" strokeDasharray="4 3" />
